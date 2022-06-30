@@ -1,4 +1,4 @@
-;;; e2wm-vcs.el --- VCS perspectives
+;;; e2wm-vcs.el --- VCS perspectives -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2011  SAKURAI Masashi
 
