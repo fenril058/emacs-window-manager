@@ -5,7 +5,7 @@
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
 ;; Version: 1.4
 ;; Keywords: tools, window manager
-;; Package-Requires: ((window-layout "1.4"))
+;; Package-Requires: ((emacs "24.4") (window-layout "1.4"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -1161,24 +1161,44 @@ defined by the perspective."
    (t
     (e2wm:pst-minor-mode-disable-frame frame))))
 
-(defadvice handle-switch-frame (around e2wm:ad-frame-override (event))
-  ad-do-it
+;; (defadvice handle-switch-frame (around e2wm:ad-frame-override (event))
+;;   ad-do-it
+;;   (e2wm:message "## FRAME SWITCH [%s] <- (%s)" event (selected-frame))
+;;   (when (eq 'switch-frame (car event))
+;;     (e2wm:pst-minor-mode-switch-frame (cadr event))))
+(defun e2wm:advice-handle-switch-frame (orig-func event)
+  "Advice function for `handle-switch-frame'.
+`ORIG-FUNC' must be `handle-switch-frame' and it gets the arg `EVENT'."
+  (funcall orig-func event)
   (e2wm:message "## FRAME SWITCH [%s] <- (%s)" event (selected-frame))
   (when (eq 'switch-frame (car event))
     (e2wm:pst-minor-mode-switch-frame (cadr event))))
+(advice-add 'handle-switch-frame :around #'e2wm:advice-handle-switch-frame)
 
 (defun e2wm:override-after-make-frame (frame)
   (e2wm:message "## MAKE FRAME [%s] <- (%s)" frame (selected-frame))
   (e2wm:pst-minor-mode-switch-frame frame))
 
-(defadvice handle-delete-frame (around e2wm:ad-frame-override (event))
+;; (defadvice handle-delete-frame (around e2wm:ad-frame-override (event))
+;;   (e2wm:message "## 1 FRAME DELETE [%s] " event)
+;;   (let* ((frame (car (cadr event)))
+;;          (next-frame (next-frame frame)))
+;;     (e2wm:message "## 2 FRAME DELETE [%s] -> (%s)" frame next-frame)
+;;     (e2wm:pst-minor-mode-switch-frame next-frame)
+;;     (select-frame next-frame))
+;;   ad-do-it)
+(defun e2wm:advice-handle-delete-frame (orig-func event)
+  "Advice function for `handle-delete-frame'.
+`ORIG-FUNC' must be `handle-delete-frame' and it gets the arg `EVENT'."
   (e2wm:message "## 1 FRAME DELETE [%s] " event)
   (let* ((frame (car (cadr event)))
          (next-frame (next-frame frame)))
     (e2wm:message "## 2 FRAME DELETE [%s] -> (%s)" frame next-frame)
     (e2wm:pst-minor-mode-switch-frame next-frame)
-    (select-frame next-frame))
-  ad-do-it)
+    (select-frame next-frame)
+    (funcall orig-func event)))
+(advice-add 'handle-delete-frame :around #'e2wm:advice-handle-delete-frame)
+;; (advice-remove 'handle-delete-frame 'e2wm:advice-handle-delete-frame)
 
 (defun e2wm:other-managed-frames (frame)
   "[internal] Get a list of manged frames other than FRAME."
@@ -1193,9 +1213,16 @@ defined by the perspective."
       (e2wm:pst-minor-mode-switch-frame next-frame)
       (select-frame next-frame))))
 
-(defadvice other-frame (after e2wm:ad-frame-override)
+;; (defadvice other-frame (after e2wm:ad-frame-override)
+;;   (e2wm:message "## OTHER FRAME [%s] " (selected-frame))
+;;   (e2wm:pst-minor-mode-switch-frame (selected-frame)))
+(defun e2wm:advice-other-frame (arg)
+  "Advice function for `other-frame'.
+`ARG' is a argument for `other-frame'."
   (e2wm:message "## OTHER FRAME [%s] " (selected-frame))
   (e2wm:pst-minor-mode-switch-frame (selected-frame)))
+(advice-add 'other-frame :after #'e2wm:advice-other-frame)
+;; (advice-remove 'other-frame 'e2wm:advice-other-frame)
 
 ;;; Perspective Set
 ;; 好みのパースペクティブのセットを作って選べるようにする
@@ -1243,9 +1270,27 @@ defined by the perspective."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; ### Advices / Overriding Functions
 
-(defadvice switch-to-buffer (around
-                             e2wm:ad-override
-                             (buf &optional norecord force-same-window))
+;; (defadvice switch-to-buffer (around
+;;                              e2wm:ad-override
+;;                              (buf &optional norecord force-same-window))
+;;   (e2wm:message "#SWITCH-TO-BUFFER %s" buf)
+;;   (let (overrided)
+;;     (when (and buf
+;;                (not e2wm:ad-now-overriding) ; 再入してなくて
+;;                (e2wm:managed-p)) ; 管理対象フレームの場合は乗っ取る
+;;       (e2wm:with-advice
+;;        (e2wm:message "#AD-SWITCH-TO-BUFFER %s" buf)
+;;        (e2wm:history-add buf)
+;;        (setq overrided (e2wm:pst-switch-to-buffer (get-buffer-create buf)))))
+;;     (if overrided
+;;         (progn
+;;           (set-buffer buf)
+;;           (setq ad-return-value (get-buffer-create buf)))
+;;       ad-do-it))) ; それ以外はもとの関数へ（画面更新はしないので必要な場合は自分でする）
+(defun e2wm:advice-switch-to-buffer (orig-func buf &rest args)
+  "Advice function for `switch-to-buffer'.
+`ORIG-FUNC' becomes `switch-to-buffer'.
+`BUF', `ARGS' are the original args."
   (e2wm:message "#SWITCH-TO-BUFFER %s" buf)
   (let (overrided)
     (when (and buf
@@ -1258,12 +1303,33 @@ defined by the perspective."
     (if overrided
         (progn
           (set-buffer buf)
-          (setq ad-return-value (get-buffer-create buf)))
-      ad-do-it))) ; それ以外はもとの関数へ（画面更新はしないので必要な場合は自分でする）
+          (get-buffer-create buf))
+      ;; それ以外はもとの関数へ (画面更新はしないので必要な場合は自分でする)
+      (apply orig-func buf args)
+      )))
+(advice-add 'switch-to-buffer :around #'e2wm:advice-switch-to-buffer)
+;; (advice-remove 'switch-to-buffer 'e2wm:advice-switch-to-buffer)
 
-(defadvice pop-to-buffer (around
-                          e2wm:ad-override
-                          (buf &optional other-window norecord))
+;; (defadvice pop-to-buffer (around
+;;                           e2wm:ad-override
+;;                           (buf &optional other-window norecord))
+;;   (e2wm:message "#POP-TO-BUFFER %s" buf)
+;;   (let (overrided)
+;;     (when (and buf
+;;                (not e2wm:ad-now-overriding) ; 再入してなくて
+;;                (e2wm:managed-p)) ; 管理対象フレームの場合は乗っ取る
+;;       (e2wm:with-advice
+;;        (e2wm:message "#AD-POP-TO-BUFFER %s" buf)
+;;        (e2wm:history-add buf)
+;;        (setq overrided (e2wm:pst-pop-to-buffer (get-buffer-create buf)))))
+;;     (if overrided
+;;         (progn
+;;           (set-buffer buf)
+;;           (setq ad-return-value (get-buffer-create buf)))
+;;       ad-do-it))) ; それ以外はもとの関数へ（画面更新はしないので必要な場合は自分でする）
+(defun e2wm:advice-pop-to-buffer (orig-func buf &rest args)
+  "`ORIG-FUNC' must be `pop-to-buffer'.
+`BUF' and `ARGS' are the original args."
   (e2wm:message "#POP-TO-BUFFER %s" buf)
   (let (overrided)
     (when (and buf
@@ -1276,12 +1342,32 @@ defined by the perspective."
     (if overrided
         (progn
           (set-buffer buf)
-          (setq ad-return-value (get-buffer-create buf)))
-      ad-do-it))) ; それ以外はもとの関数へ（画面更新はしないので必要な場合は自分でする）
+          (get-buffer-create buf))
+      ;; それ以外はもとの関数へ (画面更新はしないので必要な場合は自分でする)
+      (apply orig-func buf args))))
+(advice-add 'pop-to-buffer :around #'e2wm:advice-pop-to-buffer)
+;; (advice-remove 'pop-to-buffer 'e2wm:ad-advice-pop-to-buffer)
 
-(defadvice pop-to-buffer-same-window (around
-                                      e2wm:ad-override
-                                      (buf &optional norecord))
+;; (defadvice pop-to-buffer-same-window (around
+;;                                       e2wm:ad-override
+;;                                       (buf &optional norecord))
+;;   (e2wm:message "#POP-TO-BUFFER-SAME-WINDOW %s" buf)
+;;   (let (overrided)
+;;     (when (and buf
+;;                (not e2wm:ad-now-overriding) ; 再入してなくて
+;;                (e2wm:managed-p)) ; 管理対象フレームの場合は乗っ取る
+;;       (e2wm:with-advice
+;;        (e2wm:message "#AD-SWITCH-TO-BUFFER %s" buf)
+;;        (e2wm:history-add buf)
+;;        (setq overrided (e2wm:pst-switch-to-buffer (get-buffer-create buf)))))
+;;     (if overrided
+;;         (progn
+;;           (set-buffer buf)
+;;           (setq ad-return-value (get-buffer-create buf)))
+;;       ad-do-it))) ; それ以外はもとの関数へ（画面更新はしないので必要な場合は自分でする）
+(defun e2wm:advice-pop-to-buffer-same-window (orig-func buf &rest args)
+  "`ORIG-FUNC' must be `pop-to-buffer-same-window'.
+`BUF' and `ARGS' are the original args."
   (e2wm:message "#POP-TO-BUFFER-SAME-WINDOW %s" buf)
   (let (overrided)
     (when (and buf
@@ -1294,8 +1380,11 @@ defined by the perspective."
     (if overrided
         (progn
           (set-buffer buf)
-          (setq ad-return-value (get-buffer-create buf)))
-      ad-do-it))) ; それ以外はもとの関数へ（画面更新はしないので必要な場合は自分でする）
+          (get-buffer-create buf))
+      ;; それ以外はもとの関数へ (画面更新はしないので必要な場合は自分でする)
+      (apply orig-func buf args))))
+(advice-add 'pop-to-buffer-same-window :around #'e2wm:advice-pop-to-buffer)
+;; (advice-remove 'pop-to-buffer-same-window 'e2wm:advice-pop-to-buffer)
 
 (defun e2wm:after-bury-buffer (buried-buffer window)
   "[internal] This function is called after `bury-buffer' or
@@ -1304,18 +1393,32 @@ removes the buried buffer from the history list."
   (when (e2wm:managed-p)
     (e2wm:pst-after-bury-buffer buried-buffer window)))
 
-(defadvice quit-window (around
-                        e2wm:ad-override
-                        (&optional kill window))
-  "[internal] call `e2wm:after-bury-buffer'."
+;; (defadvice quit-window (around
+;;                         e2wm:ad-override
+;;                         (&optional kill window))
+;;   "[internal] call `e2wm:after-bury-buffer'."
+;;   (cond
+;;    ((e2wm:managed-p)
+;;     (e2wm:message "#QUIT-WINDOW %s %s" kill window)
+;;     (let ((curwin (or window (selected-window)))
+;;           (buffer (window-buffer window)))
+;;       ad-do-it
+;;       (e2wm:after-bury-buffer buffer curwin)))
+;;    (t ad-do-it)))
+(defun e2wm:advice-quit-window  (orig-func &rest args)
+  "`ORIG-FUNC' must be `quit-window'.
+`ARGS' are the original args.
+[internal] call `e2wm:after-bury-buffer'."
   (cond
    ((e2wm:managed-p)
     (e2wm:message "#QUIT-WINDOW %s %s" kill window)
     (let ((curwin (or window (selected-window)))
           (buffer (window-buffer window)))
-      ad-do-it
+      (apply orig-func args)
       (e2wm:after-bury-buffer buffer curwin)))
-   (t ad-do-it)))
+   (t (apply orig-func args))))
+(advice-add 'quit-window :around #'e2wm:advice-quit-window)
+;; (advice-remove 'quit-window 'e2wm:advice-quit-window)
 
 (eval-and-compile
   (unless (fboundp 'window-normalize-buffer)
@@ -1333,19 +1436,29 @@ removes the buried buffer from the history list."
        (t
         (error "No such buffer %s" buffer-or-name))))))
 
-(defadvice bury-buffer (around
-                        e2wm:ad-override
-                        (&optional buffer-or-name))
+;; (defadvice bury-buffer (around
+;;                         e2wm:ad-override
+;;                         (&optional buffer-or-name))
+;;   "[internal] call `e2wm:after-bury-buffer'."
+;;   (cond
+;;    ((e2wm:managed-p)
+;;     (e2wm:message "#BURY-BUFFER %s" buffer-or-name)
+;;     (let ((curwin (selected-window))
+;;           (buffer (window-normalize-buffer buffer-or-name)))
+;;       ad-do-it
+;;       (e2wm:after-bury-buffer buffer curwin)))
+;;    (t ad-do-it)))
+(defun e2wm:advice-bury-buffer (orig-func &rest buffer-or-name)
   "[internal] call `e2wm:after-bury-buffer'."
   (cond
    ((e2wm:managed-p)
     (e2wm:message "#BURY-BUFFER %s" buffer-or-name)
     (let ((curwin (selected-window))
           (buffer (window-normalize-buffer buffer-or-name)))
-      ad-do-it
+      (apply orig-func buffer-or-name)
       (e2wm:after-bury-buffer buffer curwin)))
-   (t ad-do-it)))
-
+   (t (apply orig-func buffer-or-name))))
+(advice-add 'bury-buffer :around #'e2wm:advice-bury-buffer)
 
 (defun e2wm:override-special-display-function (buf &optional args)
   (e2wm:message "#SPECIAL-DISPLAY-FUNC %s / %S - %S" buf (not e2wm:ad-now-overriding) (e2wm:managed-p))
@@ -1416,13 +1529,23 @@ Called via `kill-buffer-hook'."
 value is t, one can execute `delete-other-windows' under the e2wm
 management. For window-layout.el.")
 
-(defadvice wlf:clear-windows (around e2wm:ad-override)
+;; (defadvice wlf:clear-windows (around e2wm:ad-override)
+;;   (let ((e2wm:delete-other-windows-permission t))
+;;     ad-do-it))
+(defun e2wm:advice-wlf:clear-windows (orig-func &rest args)
   (let ((e2wm:delete-other-windows-permission t))
-    ad-do-it))
+    (apply orig-func args)))
+(advice-add 'wlf:clear-windows :around 'e2wm:advice-wlf:clear-windows)
+;; (advice-remove 'wlf:clear-windows 'e2wm:advice-wlf:clear-windows)
 
-(defadvice delete-other-windows (around e2wm:ad-override)
+;; (defadvice delete-other-windows (around e2wm:ad-override)
+;;   (when (or e2wm:delete-other-windows-permission (not (e2wm:managed-p)))
+;;     ad-do-it))
+(defun e2wm:advice-delete-other-windows (orig-func &rest args)
   (when (or e2wm:delete-other-windows-permission (not (e2wm:managed-p)))
-    ad-do-it))
+    (apply orig-func args)))
+(advice-add 'delete-other-windows :around 'e2wm:advice-delete-other-windows)
+;; (advice-remove 'delete-other-windows 'e2wm:advice-delete-other-windows)
 
 ;; コンパイルエラーのような他のウインドウへの表示をする拡張への対応
 ;; compile-goto-error の仕組みを使うものについては next-error-hook で実行
@@ -1464,7 +1587,7 @@ management. For window-layout.el.")
 ;; wcfg  : 本来のcurrent-window-configurationでとれるウインドウ配置オブジェクト
 ;; pst   : パースペクティブのインスタンスのコピー
 ;; count : デバッグ用カウンタ
-(defstruct e2wm:$wcfg wcfg pst count)
+(cl-defstruct e2wm:$wcfg wcfg pst count)
 
 (defun e2wm:override-custom-wcfg-p (cfg)
   (e2wm:$wcfg-p cfg))
@@ -1510,65 +1633,136 @@ management. For window-layout.el.")
 
 (defvar e2wm:override-window-cfg-count 0 "[internal] Window configuration counter")
 
-(defadvice current-window-configuration (around e2wm:ad-override)
-  (let ((cfg ad-do-it))
-    (cl-incf e2wm:override-window-cfg-count)
-    ;;(e2wm:message "#CURRENT-WINDOW-CONFIGURATION %s" e2wm:override-window-cfg-count)
-    (if (e2wm:managed-p)
-        (let ((data (e2wm:pst-copy-instance)))
-          (setq ad-return-value
-                (make-e2wm:$wcfg :wcfg cfg :pst data
-                      :count e2wm:override-window-cfg-count))))))
-
-(defadvice window-configuration-p (around e2wm:ad-override-long (cfg))
-  (setq ad-return-value (or (e2wm:override-custom-wcfg-p cfg) ad-do-it)))
-
-(defadvice window-configuration-frame (around e2wm:ad-override-long (cfg))
-  (when (e2wm:override-custom-wcfg-p cfg)
-    (ad-set-arg 0 (e2wm:$wcfg-wcfg cfg)))
-  ad-do-it)
-
-(defadvice compare-window-configurations (around e2wm:ad-override-long (cfg1 cfg2))
-  (when (e2wm:override-custom-wcfg-p cfg1)
-    (ad-set-arg 0 (e2wm:$wcfg-wcfg cfg1)))
-  (when (e2wm:override-custom-wcfg-p cfg2)
-    (ad-set-arg 1 (e2wm:$wcfg-wcfg cfg2)))
-  ad-do-it
-  (when (and ad-return-value (e2wm:managed-p))
-    (e2wm:message "#COMPARE-WINDOW-CONFIGURATIONS = %s" ad-return-value)
-    ;;(e2wm:debug-windows (e2wm:pst-get-wm))
-    ))
-
-(defadvice set-window-configuration (around e2wm:ad-override-long (cfg))
-  ;;(e2wm:message "#SET-WINDOW-CONFIGURATION -->")
-  (cond
-   ((e2wm:override-custom-wcfg-p cfg)
-    ;;管理対象であればwindowオブジェクトを元に戻す
-    (let ((pst-instance (e2wm:$wcfg-pst cfg))
-          (count (e2wm:$wcfg-count cfg)))
-      (ad-set-arg 0 (e2wm:$wcfg-wcfg cfg))
-      (e2wm:message "#SET-WINDOW-CONFIGURATION (ad-do-it)")
-      ad-do-it
-      ;;(e2wm:debug-windows (e2wm:$pst-wm pst-instance))
-      (when e2wm:pst-minor-mode
-        (cond
-         ((e2wm:managed-p)
-          ;;(e2wm:message "#AD-SET-WINDOW-CONFIGURATION SET %s" pst-instance)
-          (e2wm:message "#AD-SET-WINDOW-CONFIGURATION SET %s" count)
-          (e2wm:pst-set-instance pst-instance))
-         (t
-          (e2wm:message "#AD-SET-WINDOW-CONFIGURATION RESUME %s" pst-instance)
-          (e2wm:pst-set-instance pst-instance)
-          (e2wm:pst-resume pst-instance))))))
-   (t
-    ;;管理してない配置の場合はパースペクティブを無効にする
-    (when (and (e2wm:managed-p) (null e2wm:override-window-ext-managed))
-      (e2wm:message "#AD-SET-WINDOW-CONFIGURATION FINISH")
-      (e2wm:pst-finish)
-      (e2wm:pst-set-instance nil))
-    ad-do-it))
-  ;;(e2wm:message "#SET-WINDOW-CONFIGURATION <-- %s" ad-return-value)
+;; (defadvice current-window-configuration (around e2wm:ad-override)
+;;   (let ((cfg ad-do-it))
+;;     (cl-incf e2wm:override-window-cfg-count)
+;;     ;;(e2wm:message "#CURRENT-WINDOW-CONFIGURATION %s" e2wm:override-window-cfg-count)
+;;     (if (e2wm:managed-p)
+;;         (let ((data (e2wm:pst-copy-instance)))
+;;           (setq ad-return-value
+;;                 (make-e2wm:$wcfg :wcfg cfg :pst data
+;;                                  :count e2wm:override-window-cfg-count))))))
+(defun  e2wm:advice-current-window-configuration (orig-func &rest args)
+  "Advice function for `current-window-configuration'.
+`ORIG-FUNC' must be `current-window-configuration' and `ARGS' are
+the original arguments."
+  (cl-incf e2wm:override-window-cfg-count)
+  ;; (e2wm:message "#CURRENT-WINDOW-CONFIGURATION %s" e2wm:override-window-cfg-count)
+  (if (e2wm:managed-p)
+      (let ((data (e2wm:pst-copy-instance)))
+        (setq retval (make-e2wm:$wcfg :wcfg (apply orig-func args) :pst data
+                                      :count e2wm:override-window-cfg-count))))
+  (apply orig-func args)
   )
+(advice-add 'current-window-configuration :around #'e2wm:advice-current-window-configuration)
+;; (advice-remove 'current-window-configuration 'e2wm:advice-current-window-configuration)
+
+;; (defadvice window-configuration-p (around e2wm:ad-override-long (cfg))
+;;   (setq ad-return-value (or (e2wm:override-custom-wcfg-p cfg) ad-do-it)))
+(defun e2wm:advice-window-configuration-p (orig-func cfg)
+  (or (e2wm:override-custom-wcfg-p cfg) (funcall orig-func)))
+(advice-add 'window-configuration-p :around #'e2wm:advice-window-configuration-p)
+;; (advice-remove 'window-configuration-p 'e2wm:advice-window-configuration-p)
+
+;; (defadvice window-configuration-frame (around e2wm:ad-override-long (cfg))
+;;   (when (e2wm:override-custom-wcfg-p cfg)
+;;     (ad-set-arg 0 (e2wm:$wcfg-wcfg cfg)))
+;;   ad-do-it)
+(defun e2wm:advice-window-configuration-frame (orig-func cfg)
+  (let ((arg0 (if (e2wm:override-custom-wcfg-p cfg)
+                 (e2wm:$wcfg-wcfg cfg)
+               cfg)))
+    (funcall orig-func arg0)))
+(advice-add 'window-configuration-frame :around #'e2wm:advice-window-configuration-frame)
+;; (advice-remove 'window-configuration-frame 'e2wm:advice-window-configuration-frame)
+
+;; (defadvice compare-window-configurations (around e2wm:ad-override-long (cfg1 cfg2))
+;;   (when (e2wm:override-custom-wcfg-p cfg1)
+;;     (ad-set-arg 0 (e2wm:$wcfg-wcfg cfg1)))
+;;   (when (e2wm:override-custom-wcfg-p cfg2)
+;;     (ad-set-arg 1 (e2wm:$wcfg-wcfg cfg2)))
+;;   ad-do-it
+;;   (when (and ad-return-value (e2wm:managed-p))
+;;     (e2wm:message "#COMPARE-WINDOW-CONFIGURATIONS = %s" ad-return-value)
+;;     ;;(e2wm:debug-windows (e2wm:pst-get-wm))
+;;     ))
+(defun e2wm:advice-compare-window-configurations (orig-func cfg0 cfg1)
+  (let* ((arg0 (if (e2wm:override-custom-wcfg-p cfg0)
+                   (e2wm:$wcfg-wcfg cfg0)
+                 cfg0))
+         (arg1 (if (e2wm:override-custom-wcfg-p cfg1)
+                   (e2m:$wcfg-wcfg cfg1)
+                 cfg1))
+         (retval (funcall orig-func arg0 arg1)))
+    (when (and retval (e2wm:managed-p))
+      (e2wm:message "#COMPARE-WINDOW-CONFIGURATIONS = %s" retval)
+      ;;(e2wm:debug-windows (e2wm:pst-get-wm))
+      )))
+(advice-add 'compare-window-configurations :around #'e2wm:advice-compare-window-configurations)
+;; (advice-remove 'compare-window-configurations 'e2wm:advice-compare-window-configurations)
+
+;; (defadvice set-window-configuration (around e2wm:ad-override-long (cfg))
+;;   ;;(e2wm:message "#SET-WINDOW-CONFIGURATION -->")
+;;   (cond
+;;    ((e2wm:override-custom-wcfg-p cfg)
+;;     ;;管理対象であればwindowオブジェクトを元に戻す
+;;     (let ((pst-instance (e2wm:$wcfg-pst cfg))
+;;           (count (e2wm:$wcfg-count cfg)))
+;;       (ad-set-arg 0 (e2wm:$wcfg-wcfg cfg))
+;;       (e2wm:message "#SET-WINDOW-CONFIGURATION (ad-do-it)")
+;;       ad-do-it
+;;       ;;(e2wm:debug-windows (e2wm:$pst-wm pst-instance))
+;;       (when e2wm:pst-minor-mode
+;;         (cond
+;;          ((e2wm:managed-p)
+;;           ;;(e2wm:message "#AD-SET-WINDOW-CONFIGURATION SET %s" pst-instance)
+;;           (e2wm:message "#AD-SET-WINDOW-CONFIGURATION SET %s" count)
+;;           (e2wm:pst-set-instance pst-instance))
+;;          (t
+;;           (e2wm:message "#AD-SET-WINDOW-CONFIGURATION RESUME %s" pst-instance)
+;;           (e2wm:pst-set-instance pst-instance)
+;;           (e2wm:pst-resume pst-instance))))))
+;;    (t
+;;     ;;管理してない配置の場合はパースペクティブを無効にする
+;;     (when (and (e2wm:managed-p) (null e2wm:override-window-ext-managed))
+;;       (e2wm:message "#AD-SET-WINDOW-CONFIGURATION FINISH")
+;;       (e2wm:pst-finish)
+;;       (e2wm:pst-set-instance nil))
+;;     ad-do-it))
+;;   ;;(e2wm:message "#SET-WINDOW-CONFIGURATION <-- %s" ad-return-value)
+;;   )
+(defun e2wm:advice-set-window-configuration (orig-func cfg &rest args)
+        ;;(e2wm:message "#SET-WINDOW-CONFIGURATION -->")
+        (cond
+         ((e2wm:override-custom-wcfg-p cfg)
+          ;;管理対象であればwindowオブジェクトを元に戻す
+          (let ((pst-instance (e2wm:$wcfg-pst cfg))
+                (count (e2wm:$wcfg-count cfg))
+                (arg0 (e2wm:$wcfg-wcfg cfg)))
+            (e2wm:message "#SET-WINDOW-CONFIGURATION (ad-do-it)")
+            (apply orig-func arg0 args)
+            ;;(e2wm:debug-windows (e2wm:$pst-wm pst-instance))
+            (when e2wm:pst-minor-mode
+              (cond
+               ((e2wm:managed-p)
+                ;;(e2wm:message "#AD-SET-WINDOW-CONFIGURATION SET %s" pst-instance)
+                (e2wm:message "#AD-SET-WINDOW-CONFIGURATION SET %s" count)
+                (e2wm:pst-set-instance pst-instance))
+               (t
+                (e2wm:message "#AD-SET-WINDOW-CONFIGURATION RESUME %s" pst-instance)
+                (e2wm:pst-set-instance pst-instance)
+                (e2wm:pst-resume pst-instance))))))
+         (t
+          ;;管理してない配置の場合はパースペクティブを無効にする
+          (when (and (e2wm:managed-p) (null e2wm:override-window-ext-managed))
+            (e2wm:message "#AD-SET-WINDOW-CONFIGURATION FINISH")
+            (e2wm:pst-finish)
+            (e2wm:pst-set-instance nil))
+          (apply orig-func cfg args)))
+        ;;(e2wm:message "#SET-WINDOW-CONFIGURATION <-- %s" ad-return-value)
+        )
+(advice-add 'set-window-configuration :around #'e2wm:advice-set-window-configuration)
+;; (advice-remove 'set-window-configuration 'e2wm:advice-set-window-configuration)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -4107,7 +4301,7 @@ specify non-nil for `FORCE-STOP' when calling as a Lisp function."
 
 ;; for dev
 ;; (progn (setq e2wm:debug t) (toggle-debug-on-error))
-;; (progn (kill-buffer (get-buffer-create "*e2wm:debug*")) (eval-current-buffer) (e2wm:start-management))
+;; (progn (kill-buffer (get-buffer-create "*e2wm:debug*")) (eval-buffer) (e2wm:start-management))
 ;; (e2wm:stop-management)
 
 (provide 'e2wm)
