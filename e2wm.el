@@ -1657,7 +1657,7 @@ management. For window-layout.el.")
 ;;   )
 ;; ↑だと無限再帰になってしまいだめ。
 ;; :around は (lambda (&rest r) (apply function oldfun r)) になる
-(advice-add 'current-window-configuration :before-until #'e2wm:advice-current-window-configuration)
+;; (advice-add 'current-window-configuration :before-until #'e2wm:advice-current-window-configuration)
 ;; (advice-remove 'current-window-configuration 'e2wm:advice-current-window-configuration)
 
 ;; (defadvice window-configuration-p (around e2wm:ad-override-long (cfg))
