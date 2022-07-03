@@ -1633,28 +1633,31 @@ management. For window-layout.el.")
 
 (defvar e2wm:override-window-cfg-count 0 "[internal] Window configuration counter")
 
-;; (defadvice current-window-configuration (around e2wm:ad-override)
-;;   (let ((cfg ad-do-it))
+(defadvice current-window-configuration (around e2wm:ad-override)
+  (let ((cfg ad-do-it))
+    (cl-incf e2wm:override-window-cfg-count)
+    ;;(e2wm:message "#CURRENT-WINDOW-CONFIGURATION %s" e2wm:override-window-cfg-count)
+    (if (e2wm:managed-p)
+        (let ((data (e2wm:pst-copy-instance)))
+          (setq ad-return-value
+                (make-e2wm:$wcfg :wcfg cfg :pst data
+                                 :count e2wm:override-window-cfg-count))))))
+;; (defun  e2wm:advice-current-window-configuration (orig-func &optional args)
+;;   "Advice function for `current-window-configuration'.
+;; `ORIG-FUNC' must be `current-window-configuration' and `ARGS' are
+;; the original arguments."
+;;   (let ((cfg (apply orig-func args)))
 ;;     (cl-incf e2wm:override-window-cfg-count)
-;;     ;;(e2wm:message "#CURRENT-WINDOW-CONFIGURATION %s" e2wm:override-window-cfg-count)
+;;     ;; (e2wm:message "#CURRENT-WINDOW-CONFIGURATION %s" e2wm:override-window-cfg-count)
 ;;     (if (e2wm:managed-p)
 ;;         (let ((data (e2wm:pst-copy-instance)))
-;;           (setq ad-return-value
-;;                 (make-e2wm:$wcfg :wcfg cfg :pst data
-;;                                  :count e2wm:override-window-cfg-count))))))
-(defun  e2wm:advice-current-window-configuration (orig-func &rest args)
-  "Advice function for `current-window-configuration'.
-`ORIG-FUNC' must be `current-window-configuration' and `ARGS' are
-the original arguments."
-  (cl-incf e2wm:override-window-cfg-count)
-  ;; (e2wm:message "#CURRENT-WINDOW-CONFIGURATION %s" e2wm:override-window-cfg-count)
-  (if (e2wm:managed-p)
-      (let ((data (e2wm:pst-copy-instance)))
-        (setq retval (make-e2wm:$wcfg :wcfg (apply orig-func args) :pst data
-                                      :count e2wm:override-window-cfg-count))))
-  (apply orig-func args)
-  )
-(advice-add 'current-window-configuration :around #'e2wm:advice-current-window-configuration)
+;;           (setq retval (make-e2wm:$wcfg :wcfg cfg :pst data
+;;                                         :count e2wm:override-window-cfg-count))))
+;;     cfg)
+;;   )
+;; ↑だと無限再帰になってしまいだめ。
+;; :around は (lambda (&rest r) (apply function oldfun r)) になる
+(advice-add 'current-window-configuration :before-until #'e2wm:advice-current-window-configuration)
 ;; (advice-remove 'current-window-configuration 'e2wm:advice-current-window-configuration)
 
 ;; (defadvice window-configuration-p (around e2wm:ad-override-long (cfg))
