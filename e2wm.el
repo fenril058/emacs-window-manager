@@ -600,7 +600,7 @@ If no buffer is found, return BUFFER."
                    (push i nexts)
                  (push i prevs))))
     (if (or prevs nexts)
-        (cl-loop for i in (subseq (append prevs (reverse nexts)) 0 n)
+        (cl-loop for i in (cl-subseq (append prevs (reverse nexts)) 0 n)
               with last-non-nil = nil
               if i collect i and do (setq last-non-nil i)
               else collect last-non-nil)
@@ -1262,7 +1262,7 @@ defined by the perspective."
   (e2wm:aif (e2wm:pst-get-instance)
       (let* ((pset (e2wm:pstset-get-current-pstset))
              (now (e2wm:$pst-name it))
-             (pos (position now pset)))
+             (pos (cl-position now pset)))
         (e2wm:aand pos (nth (1- it) pset)
                   (e2wm:pst-change it)))))
 
@@ -1405,7 +1405,7 @@ removes the buried buffer from the history list."
 ;;       ad-do-it
 ;;       (e2wm:after-bury-buffer buffer curwin)))
 ;;    (t ad-do-it)))
-(defun e2wm:advice-quit-window  (orig-func &rest args)
+(defun e2wm:advice-quit-window  (orig-func &optional kill window)
   "`ORIG-FUNC' must be `quit-window'.
 `ARGS' are the original args.
 [internal] call `e2wm:after-bury-buffer'."
@@ -1414,9 +1414,9 @@ removes the buried buffer from the history list."
     (e2wm:message "#QUIT-WINDOW %s %s" kill window)
     (let ((curwin (or window (selected-window)))
           (buffer (window-buffer window)))
-      (apply orig-func args)
+      (apply orig-func kill window)
       (e2wm:after-bury-buffer buffer curwin)))
-   (t (apply orig-func args))))
+   (t (apply orig-func kill window))))
 (advice-add 'quit-window :around #'e2wm:advice-quit-window)
 ;; (advice-remove 'quit-window 'e2wm:advice-quit-window)
 
@@ -1775,7 +1775,7 @@ management. For window-layout.el.")
 ;; name   : プラグインの symbol
 ;; title  : 人が読む用のプラグインの名前
 ;; update : プラグイン本体の関数
-(defstruct e2wm:$plugin name title update)
+(cl-defstruct e2wm:$plugin name title update)
 
 (defvar e2wm:plugin-list nil "[internal] Plugin registory.")
 (setq e2wm:plugin-list nil)
@@ -4308,4 +4308,4 @@ specify non-nil for `FORCE-STOP' when calling as a Lisp function."
 ;; (e2wm:stop-management)
 
 (provide 'e2wm)
-;;; e2wm.el ends here
+;;; e2wm.el ends here"
