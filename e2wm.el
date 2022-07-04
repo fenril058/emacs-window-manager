@@ -5,7 +5,7 @@
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
 ;; Version: 1.4
 ;; Keywords: tools, window manager
-;; Package-Requires: ((window-layout "1.4"))
+;; Package-Requires: ((emacs "24.3") (window-layout "1.4"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -151,7 +151,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(require 'cl-lib)
 (eval-when-compile (require 'gv))
 
 (require 'imenu)
@@ -600,7 +600,7 @@ If no buffer is found, return BUFFER."
                    (push i nexts)
                  (push i prevs))))
     (if (or prevs nexts)
-        (cl-loop for i in (subseq (append prevs (reverse nexts)) 0 n)
+        (cl-loop for i in (cl-subseq (append prevs (reverse nexts)) 0 n)
               with last-non-nil = nil
               if i collect i and do (setq last-non-nil i)
               else collect last-non-nil)
@@ -618,7 +618,8 @@ editing buffer."
 
 (defun e2wm:internal-buffer-p (buf)
   "Return t, if BUF is internal buffer created by e2wm.
-The current implementation check the buffer name. TODO: improve the internal sign."
+The current implementation check the buffer name.
+TODO: improve the internal sign."
   (e2wm:aand buf (string-match "\\*WM:" (buffer-name it))))
 
 
@@ -745,7 +746,7 @@ raise the error signal with ERROR-ON-NIL."
                 ;; put all arguments in lexical scope to use it in
                 ;; `e2wm:$pst-class-super':
                 (method-name method-name)
-                (class class)
+                ;; (class class)
                 (error-on-nil error-on-nil)
                 (args args))
     (cond
@@ -938,7 +939,7 @@ are created."
         (setf (cdr it) map))))
 
 (defun e2wm:pst-resume (pst-instance)
-  "[internal] Resume the perspective which is suspended by the function `e2wm:pst-finish'."
+  "[internal] Resume the perspective suspended by the function `e2wm:pst-finish'."
   (e2wm:message "#PST-RESUME %s" pst-instance)
   ;; This function assumes that the window configuration is
   ;; restored by `set-window-configuration'.
@@ -1235,7 +1236,7 @@ defined by the perspective."
   (e2wm:aif (e2wm:pst-get-instance)
       (let* ((pset (e2wm:pstset-get-current-pstset))
              (now (e2wm:$pst-name it))
-             (pos (position now pset)))
+             (pos (cl-position now pset)))
         (e2wm:aand pos (nth (1- it) pset)
                   (e2wm:pst-change it)))))
 
@@ -3795,7 +3796,7 @@ Do not select the buffer."
   (let ((ret
          (append
           (reverse (e2wm:history-get))
-          (copy-list (e2wm:history-get-backup))
+          (cl-copy-list (e2wm:history-get-backup))
           )))
     (cl-loop for b in (buffer-list)
           if (and (e2wm:history-recordable-p b)
@@ -3808,7 +3809,7 @@ Do not select the buffer."
   (let ((ret
          (append
           (reverse (e2wm:history-get))
-          (copy-list (e2wm:history-get-backup))
+          (cl-copy-list (e2wm:history-get-backup))
           )))
     (cl-loop for b in (buffer-list)
           if (and (funcall e2wm:c-array-more-buffers-pred b)
