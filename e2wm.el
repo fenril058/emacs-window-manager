@@ -1539,7 +1539,8 @@ management. For window-layout.el.")
     ;;(e2wm:debug-windows (e2wm:pst-get-wm))
     ))
 
-(defadvice set-window-configuration (around e2wm:ad-override-long (cfg))
+(defadvice set-window-configuration (around e2wm:ad-override-long (cfg &optional dont-set-frame
+dont-set-miniwindow))
   ;;(e2wm:message "#SET-WINDOW-CONFIGURATION -->")
   (cond
    ((e2wm:override-custom-wcfg-p cfg)
@@ -1578,7 +1579,7 @@ management. For window-layout.el.")
 ;; name   : プラグインの symbol
 ;; title  : 人が読む用のプラグインの名前
 ;; update : プラグイン本体の関数
-(defstruct e2wm:$plugin name title update)
+(cl-defstruct e2wm:$plugin name title update)
 
 (defvar e2wm:plugin-list nil "[internal] Plugin registory.")
 (setq e2wm:plugin-list nil)
