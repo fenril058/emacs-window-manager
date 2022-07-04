@@ -1464,7 +1464,7 @@ management. For window-layout.el.")
 ;; wcfg  : 本来のcurrent-window-configurationでとれるウインドウ配置オブジェクト
 ;; pst   : パースペクティブのインスタンスのコピー
 ;; count : デバッグ用カウンタ
-(defstruct e2wm:$wcfg wcfg pst count)
+(cl-defstruct e2wm:$wcfg wcfg pst count)
 
 (defun e2wm:override-custom-wcfg-p (cfg)
   (e2wm:$wcfg-p cfg))
