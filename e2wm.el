@@ -1393,31 +1393,32 @@ removes the buried buffer from the history list."
   (when (e2wm:managed-p)
     (e2wm:pst-after-bury-buffer buried-buffer window)))
 
-;; (defadvice quit-window (around
-;;                         e2wm:ad-override
-;;                         (&optional kill window))
-;;   "[internal] call `e2wm:after-bury-buffer'."
-;;   (cond
-;;    ((e2wm:managed-p)
-;;     (e2wm:message "#QUIT-WINDOW %s %s" kill window)
-;;     (let ((curwin (or window (selected-window)))
-;;           (buffer (window-buffer window)))
-;;       ad-do-it
-;;       (e2wm:after-bury-buffer buffer curwin)))
-;;    (t ad-do-it)))
-(defun e2wm:advice-quit-window  (orig-func &optional kill window)
-  "`ORIG-FUNC' must be `quit-window'.
-`ARGS' are the original args.
-[internal] call `e2wm:after-bury-buffer'."
+(defadvice quit-window (around
+                        e2wm:ad-override
+                        (&optional kill window))
+  "[internal] call `e2wm:after-bury-buffer'."
   (cond
    ((e2wm:managed-p)
     (e2wm:message "#QUIT-WINDOW %s %s" kill window)
     (let ((curwin (or window (selected-window)))
           (buffer (window-buffer window)))
-      (apply orig-func kill window)
+      ad-do-it
       (e2wm:after-bury-buffer buffer curwin)))
-   (t (apply orig-func kill window))))
-(advice-add 'quit-window :around #'e2wm:advice-quit-window)
+   (t ad-do-it)))
+;; これも再帰の問題が起きているようだ
+;; (defun e2wm:advice-quit-window  (orig-func &optional kill window)
+;;   "`ORIG-FUNC' must be `quit-window'.
+;; `ARGS' are the original args.
+;; [internal] call `e2wm:after-bury-buffer'."
+;;   (cond
+;;    ((e2wm:managed-p)
+;;     (e2wm:message "#QUIT-WINDOW %s %s" kill window)
+;;     (let ((curwin (or window (selected-window)))
+;;           (buffer (window-buffer window)))
+;;       (apply orig-func kill window)
+;;       (e2wm:after-bury-buffer buffer curwin)))
+;;    (t (apply orig-func kill window))))
+;; (advice-add 'quit-window :around #'e2wm:advice-quit-window)
 ;; (advice-remove 'quit-window 'e2wm:advice-quit-window)
 
 (eval-and-compile
